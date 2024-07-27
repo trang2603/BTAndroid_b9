@@ -55,4 +55,6 @@ dependencies {
     implementation("com.google.mlkit:barcode-scanning:17.0.2")
 
     implementation("com.github.Dimezis:BlurView:version-2.0.3")
+
+    implementation("com.guolindev.permissionx:permissionx:1.8.0")
 }
