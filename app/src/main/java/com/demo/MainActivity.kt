@@ -3,6 +3,7 @@ package com.demo
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
@@ -24,12 +25,16 @@ import java.util.concurrent.Executors
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var cameraExecutor: ExecutorService
+    private var isProcessing: Boolean = false
+    private var isAnalyzing: Boolean = true
+    private lateinit var cameraProvider: ProcessCameraProvider
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // xu ly camera tren luong rieng biet
         cameraExecutor = Executors.newSingleThreadExecutor()
 
         // Yêu cầu quyền camera với PermissionX
@@ -55,27 +60,41 @@ class MainActivity : AppCompatActivity() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
         cameraProviderFuture.addListener({
-            val cameraProvider = cameraProviderFuture.get()
+            cameraProvider = cameraProviderFuture.get()
+            // hien thi hinh anh tu camera giao dien nguoi dung
             val preview =
                 Preview.Builder().build().also {
                     it.setSurfaceProvider(binding.previewView.surfaceProvider)
                 }
             val barcodeScanner = BarcodeScanning.getClient()
+            // phan tich hinh anh tu camera
             val imageAnalyzer =
-                ImageAnalysis.Builder().build().also {
-                    it.setAnalyzer(cameraExecutor, { imageProxy ->
-                        processImageProxy(barcodeScanner, imageProxy)
-                    })
-                }
+                ImageAnalysis
+                    .Builder()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_BLOCK_PRODUCER) // block producer cho den khi phan trc do phan tich xong
+                    .build()
+                    .also {
+                        it.setAnalyzer(cameraExecutor, { imageProxy ->
+                            if (isAnalyzing && !isProcessing) {
+                                isProcessing = true
+                                processImageProxy(barcodeScanner, imageProxy)
+                                Log.e("", "Phan tich hinh anh")
+                            }
+                            imageProxy.close()
+                        })
+                    }
 
+            // xac dinh sd camera nao
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
             try {
+                // ngat ket noi camera khi ko con su dung or chuan bi neu co su thay doi cau hinh
                 cameraProvider.unbindAll()
+                // lien ket voi vong doi activity de dc quan ly trang thai nhu activity
                 cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalyzer)
             } catch (exc: Exception) {
                 exc.printStackTrace()
             }
-        }, ContextCompat.getMainExecutor(this))
+        }, ContextCompat.getMainExecutor(this)) // dam bao duoc thuc hien tren luong chinh
     }
 
     private fun processImageProxy(
@@ -84,6 +103,7 @@ class MainActivity : AppCompatActivity() {
     ) {
         val mediaImg = imageProxy.image
         if (mediaImg != null) {
+            // tao doi tuong su dung cho viec phan tich hinh anh
             val img = InputImage.fromMediaImage(mediaImg, imageProxy.imageInfo.rotationDegrees)
             barcodeScanner
                 .process(img)
@@ -99,17 +119,33 @@ class MainActivity : AppCompatActivity() {
                             val searchUrl = "https://www.google.com/search?q=$it"
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(searchUrl))
                             startActivity(intent)
+                            stopCamera()
                         }
                     }
+                    isProcessing = false
                     // dong imgProxy de giai phong tai nguyen
                     imageProxy.close()
                 }.addOnFailureListener { e ->
                     // xu ly neu quet khong thanh cong
                     e.printStackTrace()
                     imageProxy.close()
+                    isProcessing = false
                 }
         } else {
+            isProcessing = false
             imageProxy.close()
+        }
+    }
+
+    private fun stopCamera() {
+        cameraProvider.unbindAll()
+        isAnalyzing = false
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!isAnalyzing) {
+            startCamera()
         }
     }
 
