@@ -19,6 +19,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.permissionx.guolindev.PermissionX
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.regex.Pattern
 
 // cho phep su dung API trong cameraX
 @androidx.camera.core.ExperimentalGetImage
@@ -116,10 +117,14 @@ class MainActivity : AppCompatActivity() {
 
                         // neu ma vach co gia tri, huong den trang gg tim kiem
                         barcodeValue?.let {
-                            val searchUrl = "https://www.google.com/search?q=$it"
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(searchUrl))
-                            startActivity(intent)
-                            stopCamera()
+                            if (isValiUrl(it)) {
+                                stopCamera()
+                                Log.e("MainActivity", "da dung camera")
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(it))
+                                startActivity(intent)
+                            } else {
+                                Toast.makeText(this, it, Toast.LENGTH_SHORT).show()
+                            }
                         }
                     }
                     isProcessing = false
@@ -135,6 +140,15 @@ class MainActivity : AppCompatActivity() {
             isProcessing = false
             imageProxy.close()
         }
+    }
+
+    private fun isValiUrl(url: String): Boolean {
+        val urlPattern =
+            Pattern.compile(
+                "^(https?|ftp)://[\\w-]+(\\.[\\w-]+)+[/#?]?.*$",
+                Pattern.CASE_INSENSITIVE,
+            )
+        return urlPattern.matcher(url).matches()
     }
 
     private fun stopCamera() {

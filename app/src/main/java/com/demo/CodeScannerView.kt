@@ -59,7 +59,7 @@ class CodeScannerView(
         paint.strokeWidth = 5f
         paint.strokeCap = Paint.Cap.ROUND
 
-        val cornerLength = 150f // Độ dài của đường line ở góc
+        val cornerLength = 100f // Độ dài của đường line ở góc
 
         // Vẽ các góc trên bên trái với bo góc
         canvas.drawLine(left + cornerRadius, top.toFloat(), left + cornerLength, top.toFloat(), paint)
